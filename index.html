@@ -2,320 +2,276 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>拔河隊員管理系統</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>青埔國中 114 學年度七年級第一次段考 - 即時儀表板</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .input-card {
-            transition: all 0.2s ease;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Noto+Sans+TC:wght@100..900&display=swap');
+        
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            background-color: #a4c9e4;
+            background-image: radial-gradient(#d3e6f5 1px, transparent 1px), radial-gradient(#d3e6f5 1px, transparent 1px);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            zoom: 95%;
+            overflow: hidden; /* 預設禁止滾動 */
         }
-        .input-card.is-empty {
-            opacity: 0.5;
-            background-color: #f3f4f6;
-            pointer-events: none;
+
+        /* --- 1920*1080 固定解析度遮罩邏輯 --- */
+        #fullscreen-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #020617; /* 最深色背景 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 99999;
+            cursor: pointer;
+            overflow: hidden;
         }
-        .input-card.is-empty .empty-toggle-area {
-            pointer-events: auto;
+
+        /* 固定 16:9 的內容區域 */
+        #overlay-content-area {
+            width: 1920px;
+            height: 1080px;
+            background-color: #0f172a; /* 內容區域的深色背景 */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid #1e293b; /* 可選：加個邊框區分 1920 區域 */
+            box-shadow: 0 0 100px rgba(0,0,0,0.8);
+            
+            /* RWD 防呆：當螢幕小於 1920*1080 時自動縮放 */
+            max-width: 100vw;
+            max-height: 100vh;
+            aspect-ratio: 1920 / 1080;
         }
-        input::-webkit-outer-spin-button,
-        input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        #input-scroll-area::-webkit-scrollbar {
-            width: 6px;
-        }
-        #input-scroll-area::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-        #input-scroll-area::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 10px;
-        }
+
+        .dashboard-container { max-width: 1100px; width: 100%; }
+        .card { background-color: white; border-radius: 1.5rem; padding: 1.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .exam-table th, .exam-table td { padding: 16px 20px; font-size: 1.3rem; text-align: center; border-bottom: 1px solid #f0f0f0; }
+        .subject-name { font-weight: 800; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
 </head>
-<body class="bg-slate-100 h-screen overflow-hidden flex flex-col">
+<body id="body-tag">
 
-    <!-- 頂部標題 -->
-    <header class="bg-white border-b border-slate-200 px-6 py-4 flex-none">
-        <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            拔河最佳組合系統
-        </h1>
-        <p class="text-xs text-slate-500 mt-1 font-medium">1-20 男生 | 21-40 女生 (總人數不限，總重 ≤ 600kg，女生 ≥ 4人)</p>
-    </header>
+    <div id="fullscreen-overlay" onclick="requestFullScreen()">
+        <div id="overlay-content-area" class="p-10">
+            <h2 id="overlay-text" class="text-6xl font-black mb-20 leading-tight text-center">
+                請點擊畫面進入全螢幕模式
+            </h2>
+            <button id="overlay-confirm-btn" onclick="hideOverlay(event)" 
+                    class="hidden px-24 py-8 bg-blue-600 text-white rounded-full font-black text-4xl hover:bg-blue-700 transition-all shadow-2xl active:scale-95">
+                確 定
+            </button>
+        </div>
+    </div>
 
-    <main class="flex flex-1 overflow-hidden">
-        <!-- 左側：輸入框區域 -->
-        <div id="input-scroll-area" class="w-full lg:w-3/5 p-6 overflow-y-auto bg-slate-50 border-r border-slate-200">
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4" id="input-grid">
-                <!-- 由 JavaScript 生成 -->
+    <div class="dashboard-container">
+        <header class="text-center mb-6">
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-blue-900">
+                青埔國中 114 學年度七年級第一次段考
+            </h1>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div class="card flex flex-col items-center justify-center text-center">
+                <h2 class="text-xl font-bold text-gray-800 mb-2">⏱️ 當前日期與時間</h2>
+                <div id="current-date" class="text-2xl font-semibold text-gray-700 mb-2"></div>
+                <div id="current-time" class="text-5xl sm:text-6xl font-extrabold text-blue-600"></div>
+            </div>
+
+            <div class="card flex flex-col justify-center">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">👥 考場人數統計</h2>
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <p class="text-gray-500 font-bold mb-1">應到</p>
+                        <input type="number" id="total-students" value="30" min="0" oninput="updateAttendance()" 
+                               class="w-full text-3xl font-black text-center border-b-2 border-gray-200 focus:border-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <p class="text-gray-500 font-bold mb-1">實到</p>
+                        <input type="number" id="present-students" value="30" min="0" oninput="updateAttendance()" 
+                               class="w-full text-3xl font-black text-center text-green-600 border-b-2 border-gray-200 focus:border-green-500 outline-none">
+                    </div>
+                    <div>
+                        <p class="text-gray-500 font-bold mb-1">缺席</p>
+                        <div id="absent-students" class="text-3xl font-black text-red-600">0</div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- 右側：即時計算區域 -->
-        <aside class="w-full lg:w-2/5 p-6 bg-white flex flex-col gap-6 shadow-[-4px_0_15px_rgba(0,0,0,0.02)] overflow-y-auto">
-            <div class="space-y-6">
-                <h2 class="text-lg font-bold text-slate-700 border-b pb-2">數據即時分析</h2>
-                
-                <!-- 當前全體統計 -->
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                        <p class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">輸入總重</p>
-                        <div class="flex items-baseline gap-1 mt-1">
-                            <span id="display-total-weight" class="text-2xl font-mono font-bold text-slate-800">0.0</span>
-                            <span class="text-xs text-slate-400">kg</span>
-                        </div>
-                    </div>
-                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                        <p class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">總人數</p>
-                        <p id="display-total-count" class="text-2xl font-mono font-bold text-slate-800 mt-1">0</p>
-                    </div>
-                </div>
-
-                <!-- 最佳組合推薦區域 -->
-                <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-5 shadow-sm">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-indigo-800 flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                            </svg>
-                            推薦出賽名單 (不限人數)
-                        </h3>
-                        <span id="comb-status" class="text-[10px] bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded font-bold uppercase tracking-widest">分析中</span>
-                    </div>
-
-                    <div id="combination-result" class="min-h-[100px]">
-                        <!-- 分析結果顯示於此 -->
-                    </div>
-
-                    <div id="comb-summary" class="hidden mt-4 pt-4 border-t border-indigo-200">
-                        <div class="flex justify-between text-base font-black text-indigo-900">
-                            <span>組合預估總重:</span>
-                            <span><span id="comb-weight">0.0</span> kg</span>
-                        </div>
-                        <div class="flex justify-between text-xs text-indigo-700 mt-2 font-bold italic">
-                            <span>組合構成:</span>
-                            <span><span id="comb-males">0</span>男 + <span id="comb-females">0</span>女 = 共 <span id="comb-total">0</span> 人</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 規則進度 -->
-                <div class="space-y-3">
-                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">參賽門檻檢核</p>
-                    <div id="rule-female" class="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50 text-xs transition-all">
-                        <div class="flex items-center gap-2">
-                            <span class="check-icon">⚪</span>
-                            <span>女生人數達 4 人以上</span>
-                        </div>
-                        <span id="female-count-badge" class="font-mono font-bold text-slate-400 text-sm">0</span>
-                    </div>
-                    <div id="rule-weight" class="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50 text-xs transition-all">
-                        <div class="flex items-center gap-2">
-                            <span class="check-icon">⚪</span>
-                            <span>總重量不超過 600.0 kg</span>
-                        </div>
-                        <span id="weight-check-badge" class="font-mono font-bold text-slate-400 text-sm">--</span>
-                    </div>
-                </div>
+        <div class="card mb-6 flex flex-col items-center justify-center p-6 text-center">
+            <p class="text-xl font-semibold text-gray-500 mb-3">📝 現在科目與活動狀態</p>
+            <div id="current-subject-output" class="text-2xl sm:text-4xl font-bold min-h-[3rem]">載入中...</div>
+        </div>
+        
+        <div class="card">
+            <div class="flex justify-center space-x-4 mb-6">
+                <button id="btn-day1" onclick="switchDay('Day1')" class="px-8 py-3 rounded-full font-bold transition-all bg-blue-600 text-white shadow-lg">04/01（三）</button>
+                <button id="btn-day2" onclick="switchDay('Day2')" class="px-8 py-3 rounded-full font-bold transition-all bg-gray-200 text-gray-700">04/02（四）</button>
             </div>
-
-            <!-- 操作 -->
-            <div class="mt-auto flex gap-3 pt-4 border-t">
-                <button onclick="window.location.reload()" class="flex-1 py-2 text-slate-500 rounded-lg font-bold text-xs hover:bg-slate-100 transition-colors uppercase border border-slate-200">全部清除</button>
-                <button onclick="window.print()" class="flex-1 py-2 bg-indigo-600 text-white rounded-lg font-bold text-xs hover:bg-indigo-700 transition-colors shadow-sm">列印報表</button>
+            <div class="overflow-x-auto">
+                <table class="w-full exam-table">
+                    <thead>
+                        <tr class="bg-gray-50">
+                            <th class="w-1/4">節次</th>
+                            <th class="w-1/3">時間</th>
+                            <th id="exam-day-header">科目</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schedule-table-body" class="bg-white"></tbody>
+                </table>
             </div>
-        </aside>
-    </main>
+        </div>
+    </div>
 
     <script>
-        const inputGrid = document.getElementById('input-grid');
-        const displayTotalWeight = document.getElementById('display-total-weight');
-        const displayTotalCount = document.getElementById('display-total-count');
-        const combinationResult = document.getElementById('combination-result');
-        const combSummary = document.getElementById('comb-summary');
-        const combWeight = document.getElementById('comb-weight');
-        const combMales = document.getElementById('comb-males');
-        const combFemales = document.getElementById('comb-females');
-        const combTotal = document.getElementById('comb-total');
-        const combStatus = document.getElementById('comb-status');
-        const femaleCountBadge = document.getElementById('female-count-badge');
-        const weightCheckBadge = document.getElementById('weight-check-badge');
-
-        const MAX_WEIGHT_LIMIT = 600.0;
-        const MIN_FEMALES_REQUIRED = 4;
-
-        function createInputs() {
-            for (let i = 1; i <= 40; i++) {
-                const isFemale = (i >= 21);
-                const card = document.createElement('div');
-                card.id = `card-${i}`;
-                card.className = `input-card bg-white p-3 rounded-xl shadow-sm border ${isFemale ? 'border-pink-100' : 'border-blue-100'} flex flex-col gap-2`;
-                card.innerHTML = `
-                    <div class="flex justify-between items-center">
-                        <span class="text-[10px] font-bold px-2 py-0.5 rounded ${isFemale ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}">
-                            # ${String(i).padStart(2, '0')} ${isFemale ? '女生' : '男生'}
-                        </span>
-                        <label class="empty-toggle-area flex items-center gap-1 cursor-pointer">
-                            <input type="checkbox" class="empty-checkbox w-3.5 h-3.5 rounded border-slate-300 text-slate-600 focus:ring-slate-500" onchange="toggleEmpty(${i})">
-                            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">空號</span>
-                        </label>
-                    </div>
-                    <div class="relative">
-                        <input type="number" step="0.1" min="0" 
-                            class="weight-input w-full text-base font-mono font-bold bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 outline-none focus:ring-2 ${isFemale ? 'focus:ring-pink-400' : 'focus:ring-blue-400'} transition-all"
-                            placeholder="0.0" oninput="updateCalculation()">
-                        <span class="absolute right-3 top-2.5 text-[10px] text-slate-300 font-bold uppercase">kg</span>
-                    </div>
-                `;
-                inputGrid.appendChild(card);
+        // --- 全螢幕遮罩邏輯修復 ---
+        function requestFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log("全螢幕請求失敗");
+                });
             }
         }
 
-        window.toggleEmpty = function(id) {
-            const card = document.getElementById(`card-${id}`);
-            if (card.querySelector('.empty-checkbox').checked) {
-                card.classList.add('is-empty');
-                card.querySelector('.weight-input').value = '';
+        document.addEventListener('fullscreenchange', () => {
+            const overlay = document.getElementById('fullscreen-overlay');
+            const text = document.getElementById('overlay-text');
+            const btn = document.getElementById('overlay-confirm-btn');
+
+            if (document.fullscreenElement) {
+                // 進入全螢幕後：更換文字，顯現確定按鈕
+                text.innerHTML = "已進入全螢幕模式<br><span class='text-4xl text-gray-400 mt-10 block'>按 ESC 鍵可退出並重新鎖定</span>";
+                btn.classList.remove('hidden');
+                overlay.style.cursor = "default";
             } else {
-                card.classList.remove('is-empty');
+                // 退出全螢幕：強制重整
+                window.location.reload();
             }
-            updateCalculation();
+        });
+
+        function hideOverlay(event) {
+            // 重要：阻止點擊事件冒泡到父層 overlay 再次觸發 requestFullScreen
+            event.stopPropagation(); 
+            const overlay = document.getElementById('fullscreen-overlay');
+            overlay.style.display = 'none'; // 直接隱藏
+            document.getElementById('body-tag').style.overflow = 'auto'; // 允許滾動內容
         }
 
-        window.updateCalculation = function() {
-            let availableMales = [];
-            let availableFemales = [];
-            let rawTotalWeight = 0;
-            let rawTotalCount = 0;
-
-            for (let i = 1; i <= 40; i++) {
-                const card = document.getElementById(`card-${i}`);
-                if (!card.querySelector('.empty-checkbox').checked) {
-                    const val = card.querySelector('.weight-input').value;
-                    const weight = parseFloat(val) || 0;
-                    if (val !== '' && weight > 0) {
-                        rawTotalWeight += weight;
-                        rawTotalCount++;
-                        const member = { id: i, weight: weight, gender: (i >= 21 ? 'F' : 'M') };
-                        if (i >= 21) availableFemales.push(member);
-                        else availableMales.push(member);
-                    }
-                }
-            }
-
-            displayTotalWeight.innerText = rawTotalWeight.toFixed(1);
-            displayTotalCount.innerText = rawTotalCount;
-            femaleCountBadge.innerText = availableFemales.length;
-
-            updateRuleUI('rule-female', availableFemales.length >= MIN_FEMALES_REQUIRED, availableFemales.length > 0);
-            updateRuleUI('rule-weight', rawTotalWeight <= MAX_WEIGHT_LIMIT, rawTotalWeight > 0);
-            weightCheckBadge.innerText = rawTotalWeight > 0 ? (rawTotalWeight.toFixed(1) + ' kg') : '--';
-
-            // 尋找最佳不限人數組合
-            solveOptimalTeam(availableMales, availableFemales);
+        // --- 其餘考程與計時邏輯保持不變 ---
+        function updateAttendance() {
+            const totalInput = document.getElementById('total-students');
+            const presentInput = document.getElementById('present-students');
+            let total = parseInt(totalInput.value) || 0;
+            let present = parseInt(presentInput.value) || 0;
+            if (total < 0) total = 0; totalInput.value = total;
+            if (present < 0) present = 0;
+            if (present > total) present = total; presentInput.value = present;
+            document.getElementById('absent-students').textContent = total - present;
         }
 
-        function solveOptimalTeam(males, females) {
-            if (females.length < MIN_FEMALES_REQUIRED) {
-                combinationResult.innerHTML = `<div class="flex flex-col items-center justify-center py-6 text-indigo-400 opacity-60">
-                    <p class="text-xs font-bold uppercase">規則未達標</p>
-                    <p class="text-[10px]">女生至少需輸入 ${MIN_FEMALES_REQUIRED} 人才能分析組合</p>
-                </div>`;
-                combSummary.classList.add('hidden');
-                combStatus.innerText = "等待女生";
-                combStatus.className = "text-[10px] bg-slate-100 text-slate-400 px-2 py-0.5 rounded font-bold uppercase";
-                return;
-            }
+        const DAY1_DATE_STR = "2026/04/01";
+        const DAY2_DATE_STR = "2026/04/02";
+        const SCHEDULE_DATA = [
+            { session: '第一節', time: '08:30–09:15', day1: { name: '自習', isExam: false }, day2: { name: '自習', isExam: false } },
+            { session: '第二節', time: '09:25–10:10', day1: { name: '國文', isExam: true }, day2: { name: '英文(含聽力)', isExam: true } },
+            { session: '第三節', time: '10:20–11:05', day1: { name: '自習', isExam: false }, day2: { name: '自習', isExam: false } },
+            { session: '第四節', time: '11:15–12:00', day1: { name: '生物', isExam: true }, day2: { name: '數學', isExam: true } },
+            { session: '午休',   time: '12:00–13:15', day1: { name: '午休及午餐', isExam: false }, day2: { name: '午休及午餐', isExam: false } },
+            { session: '第五節', time: '13:15–13:55', day1: { name: '自習', isExam: false }, day2: { name: '班際體育競賽', isExam: false } },
+            { session: '第六節', time: '14:05–14:55', day1: { name: '寫作測驗', isExam: true }, day2: { name: '班際體育競賽', isExam: false } },
+            { session: '第七節', time: '15:05–15:50', day1: { name: '社會', isExam: true }, day2: { name: '班際體育競賽', isExam: false } },
+        ];
 
-            // 策略：
-            // 1. 先選出最重的 4 個女生（滿足低消）
-            // 2. 將剩下的所有人（男生+剩下女生）混合，依重量從重到輕排列
-            // 3. 依序加入組合，直到加上下一個人會超過 600kg 為止
-            
-            let sortedFemales = [...females].sort((a, b) => b.weight - a.weight);
-            let mustHaveFemales = sortedFemales.slice(0, MIN_FEMALES_REQUIRED);
-            let others = [...sortedFemales.slice(MIN_FEMALES_REQUIRED), ...males].sort((a, b) => b.weight - a.weight);
+        let currentView = 'Day1';
+        function switchDay(day) {
+            currentView = day;
+            const isDay1 = (day === 'Day1');
+            document.getElementById('btn-day1').className = isDay1 ? 'px-8 py-3 rounded-full font-bold bg-blue-600 text-white shadow-lg' : 'px-8 py-3 rounded-full font-bold bg-gray-200 text-gray-700';
+            document.getElementById('btn-day2').className = !isDay1 ? 'px-8 py-3 rounded-full font-bold bg-blue-600 text-white shadow-lg' : 'px-8 py-3 rounded-full font-bold bg-gray-200 text-gray-700';
+            document.getElementById('exam-day-header').textContent = isDay1 ? '04/01（三）科目' : '04/02（四）科目';
+            renderTable();
+        }
 
-            let bestTeam = [...mustHaveFemales];
-            let currentWeight = bestTeam.reduce((sum, p) => sum + p.weight, 0);
+        function renderTable() {
+            const body = document.getElementById('schedule-table-body');
+            body.innerHTML = '';
+            const now = new Date();
+            const todayStr = now.toLocaleDateString('zh-TW', {year:'numeric', month:'2-digit', day:'2-digit'}).replace(/\//g, '/');
+            const nowMin = now.getHours() * 60 + now.getMinutes();
 
-            if (currentWeight > MAX_WEIGHT_LIMIT) {
-                // 如果光 4 個最重的女生就超重，改選最輕的 4 個
-                let lightestFemales = [...females].sort((a, b) => a.weight - b.weight);
-                bestTeam = lightestFemales.slice(0, MIN_FEMALES_REQUIRED);
-                currentWeight = bestTeam.reduce((sum, p) => sum + p.weight, 0);
+            SCHEDULE_DATA.forEach(item => {
+                const row = document.createElement('tr');
+                const [startStr, endStr] = item.time.split('–');
+                const startMin = parseInt(startStr.split(':')[0]) * 60 + parseInt(startStr.split(':')[1]);
+                const endMin = parseInt(endStr.split(':')[0]) * 60 + parseInt(endStr.split(':')[1]);
+                const isCorrectDay = (todayStr === DAY1_DATE_STR && currentView === 'Day1') || (todayStr === DAY2_DATE_STR && currentView === 'Day2');
                 
-                if (currentWeight > MAX_WEIGHT_LIMIT) {
-                    renderNoSolution();
-                    return;
+                if (isCorrectDay && nowMin >= startMin && nowMin < endMin) {
+                    row.className = 'bg-yellow-100 ring-2 ring-yellow-400 ring-inset font-bold';
                 }
-            }
-
-            // 繼續往上加人，直到極限
-            for (let candidate of others) {
-                if (currentWeight + candidate.weight <= MAX_WEIGHT_LIMIT) {
-                    bestTeam.push(candidate);
-                    currentWeight += candidate.weight;
-                }
-            }
-
-            renderBestTeam(bestTeam, currentWeight);
-        }
-
-        function renderNoSolution() {
-            combinationResult.innerHTML = `<p class="text-sm text-red-600 text-center py-6 font-bold">❌ 目前女生組員過重，無法湊出符合規則的組合</p>`;
-            combSummary.classList.add('hidden');
-            combStatus.innerText = "無解";
-            combStatus.className = "text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold uppercase";
-        }
-
-        function renderBestTeam(team, weight) {
-            combinationResult.innerHTML = '';
-            const list = document.createElement('div');
-            list.className = "grid grid-cols-4 sm:grid-cols-5 gap-2";
-            
-            team.sort((a, b) => a.id - b.id).forEach(p => {
-                const item = document.createElement('div');
-                const isF = p.id >= 21;
-                item.className = `p-2 rounded-lg border-2 text-center transition-all ${isF ? 'bg-pink-50 border-pink-200 text-pink-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`;
-                item.innerHTML = `<div class="text-[10px] font-black leading-none mb-1">#${p.id}</div><div class="text-xs font-mono font-black">${p.weight}</div>`;
-                list.appendChild(item);
+                
+                const dayData = (currentView === 'Day1') ? item.day1 : item.day2;
+                const subjectColor = dayData.isExam ? 'text-red-600' : 'text-green-600';
+                row.innerHTML = `<td>${item.session}</td><td>${item.time}</td><td><span class="subject-name ${subjectColor}">${dayData.name}</span></td>`;
+                body.appendChild(row);
             });
-            
-            combinationResult.appendChild(list);
-            
-            const mCount = team.filter(p => p.id <= 20).length;
-            const fCount = team.filter(p => p.id >= 21).length;
-
-            combWeight.innerText = weight.toFixed(1);
-            combMales.innerText = mCount;
-            combFemales.innerText = fCount;
-            combTotal.innerText = team.length;
-            combSummary.classList.remove('hidden');
-            combStatus.innerText = "最重組合";
-            combStatus.className = "text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold uppercase tracking-widest";
         }
 
-        function updateRuleUI(id, isOk, hasData) {
-            const el = document.getElementById(id);
-            const icon = el.querySelector('.check-icon');
-            if (!hasData) {
-                el.className = "flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50 text-xs text-slate-400";
-                icon.innerText = "⚪";
-            } else if (isOk) {
-                el.className = "flex items-center justify-between p-3 rounded-lg border border-green-200 bg-green-50 text-xs text-green-700 font-bold";
-                icon.innerText = "✅";
-            } else {
-                el.className = "flex items-center justify-between p-3 rounded-lg border border-red-200 bg-red-50 text-xs text-red-700 font-bold animate-pulse";
-                icon.innerText = "❌";
+        function updateClock() {
+            const now = new Date();
+            const todayStr = now.toLocaleDateString('zh-TW', {year:'numeric', month:'2-digit', day:'2-digit'}).replace(/\//g, '/');
+            document.getElementById('current-date').textContent = now.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long' });
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('zh-TW', { hour12: false });
+            
+            let statusText = (todayStr !== DAY1_DATE_STR && todayStr !== DAY2_DATE_STR) ? "📅 目前非段考日期" : "今日考程尚未開始";
+            let statusClass = "text-gray-500";
+
+            if (todayStr === DAY1_DATE_STR || todayStr === DAY2_DATE_STR) {
+                const nowMin = now.getHours() * 60 + now.getMinutes();
+                SCHEDULE_DATA.forEach(item => {
+                    const [startStr, endStr] = item.time.split('–');
+                    const startMin = parseInt(startStr.split(':')[0]) * 60 + parseInt(startStr.split(':')[1]);
+                    const endMin = parseInt(endStr.split(':')[0]) * 60 + parseInt(endStr.split(':')[1]);
+                    const dayData = (todayStr === DAY1_DATE_STR) ? item.day1 : item.day2;
+                    if (nowMin >= startMin && nowMin < endMin) {
+                        statusText = `正在進行：${dayData.name}`;
+                        statusClass = dayData.isExam ? "text-red-600 animate-pulse" : "text-blue-700";
+                    }
+                });
             }
+            const output = document.getElementById('current-subject-output');
+            output.textContent = statusText;
+            output.className = `text-2xl sm:text-4xl font-bold ${statusClass}`;
         }
 
-        window.onload = createInputs;
+        setInterval(updateClock, 1000);
+        window.onload = () => {
+            const now = new Date();
+            const todayStr = now.toLocaleDateString('zh-TW', {year:'numeric', month:'2-digit', day:'2-digit'}).replace(/\//g, '/');
+            if (todayStr === DAY2_DATE_STR) switchDay('Day2'); else switchDay('Day1');
+            updateClock(); 
+            updateAttendance();
+        };
     </script>
 </body>
 </html>
